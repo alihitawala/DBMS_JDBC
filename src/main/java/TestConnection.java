@@ -25,21 +25,26 @@ public class TestConnection {
     }
 
     public void execute() throws SQLException {
+        this.setSchema();
         while(true) {
-            showOptions();
-            int opt = this.sc.nextInt();
-            switch (opt) {
-                case 1:
-                    tableQuery();
-                    break;
-                case 2:
-                    rawQuery();
-                    break;
-                case 3:
-                    resetSeed();
-                    break;
-                default:
-                    System.exit(0);
+            try {
+                showOptions();
+                int opt = this.sc.nextInt();
+                switch (opt) {
+                    case 1:
+                        tableQuery();
+                        break;
+                    case 2:
+                        rawQuery();
+                        break;
+                    case 3:
+                        resetSeed();
+                        break;
+                    default:
+                        System.exit(0);
+                }
+            } catch (Exception ex) {
+                System.out.println(ex.getMessage());
             }
         }
     }
@@ -51,76 +56,146 @@ public class TestConnection {
     }
 
     public static void main(String[] args) throws Exception {
-        new TestConnection().executeTest();
-//        System.out.println(new TestConnection().sampleMfromN(10,11));
+//        new TestConnection().setSchema();
         new TestConnection().execute();
     }
 
-    private void executeTest() throws SQLException {
+    private void setSchema() throws SQLException {
         Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("select count(*) from hw3.sales");
-        while (rs.next()) {
-            System.out.print("Row returned: ");
-            System.out.println(rs.getInt(1));
-        }
+        st.execute("set search_path to '" + "hw3" + "'");
         st.close();
-        rs.close();
     }
 
     private void resetSeed() {
-
+        System.out.print("Enter new seed : ");
+        this.random.setSeed(sc.nextInt());
     }
 
     private void rawQuery() {
-
+        System.out.print("Enter query (only select): ");
+        String query = "";
+        try {
+            query = br.readLine().trim().toLowerCase();
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error in taking input!");
+        }
+        this.sampleAndRunQuery(query);
     }
 
     private void tableQuery() {
         System.out.print("Enter table name: ");
         String tableName = "";
         try {
-            tableName = br.readLine();
+            tableName = br.readLine().trim().toLowerCase();
         } catch (IOException e) {
             e.printStackTrace();
             throw new RuntimeException("Error in taking input!");
         }
+        String rawQuery = "select * from hw3." + tableName;
+        this.sampleAndRunQuery(rawQuery);
+    }
+
+    private void sampleAndRunQuery(String rawQuery) {
         int n = this.askForSampleNumber();
         int N;
         try {
-            N = this.getRowCount(tableName);
+            N = this.getRowCount(rawQuery);
         }
         catch (Exception ex) {
-            throw new RuntimeException("Table not found!");
+            throw new RuntimeException("SQL Error : error in query check table name and associated schema to fix!");
         }
         List<Integer> rows = this.sampleMfromN(n, N);
         String inList = getInList(rows);
         try {
-            executeQuery("select * from hw3." + tableName, inList);
+            executeQuery(rawQuery, inList);
         } catch (Exception ex) {
-            throw new RuntimeException("Error in SQL query!");
+            throw new RuntimeException(ex.getMessage());
         }
     }
 
     private void executeQuery(String rawQuery, String inList) throws SQLException {
         Statement st = conn.createStatement();
         String query = constructQuery(rawQuery, inList);
-        ResultSet rs = st.executeQuery(query);
-        ResultSetMetaData rsmd = rs.getMetaData();
-        int columnsNumber = rsmd.getColumnCount();
-        for (int i = 2; i <= columnsNumber; i++) {
-            System.out.print(rsmd.getColumnName(i) + "\t");
+        ResultSet rs;
+        try {
+            rs = st.executeQuery(query);
+        } catch (Exception ex) {
+            throw new RuntimeException("Error in SQL query!");
         }
-        System.out.println();
-        while (rs.next()) {
+        ResultSetMetaData rsmd = rs.getMetaData();
+        boolean isStdOut = isStdOut();
+        if (isStdOut) {
+            int columnsNumber = rsmd.getColumnCount();
             for (int i = 2; i <= columnsNumber; i++) {
-//                if (i > 1) System.out.print(",  ");
-                String columnValue = rs.getString(i);
-                System.out.print(columnValue + "\t");
+                System.out.print(rsmd.getColumnName(i) + "\t");
             }
-            System.out.println("");
+            System.out.println();
+            while (rs.next()) {
+                for (int i = 2; i <= columnsNumber; i++) {
+//                if (i > 1) System.out.print(",  ");
+                    String columnValue = rs.getString(i);
+                    System.out.print(columnValue + "\t");
+                }
+                System.out.println("");
+            }
+        } else {
+            System.out.print("Enter new table name: ");
+            String tableName = "";
+            try {
+                tableName = br.readLine().trim().toLowerCase();
+            } catch (IOException e) {
+                throw new RuntimeException("Error in taking input!");
+            }
+            try {
+                this.createNewTable(tableName, rsmd);
+                this.insertDataIntoNewTable(tableName, rs);
+            } catch (Exception ex) {
+                throw new RuntimeException("Error in creating new table!");
+            }
         }
         st.close();
         rs.close();
+    }
+
+    private void insertDataIntoNewTable(String tableName, ResultSet rs) throws SQLException {
+        String insertQ = "insert into " + tableName + " values ";
+        Statement st = conn.createStatement();
+        while (rs.next()) {
+            StringBuilder builder = new StringBuilder("(");
+            String delim = "";
+            ResultSetMetaData metaData = rs.getMetaData();
+            for (int i = 2; i <= metaData.getColumnCount(); i++) {
+                String columnValue = rs.getString(i);
+                String type = metaData.getColumnTypeName(i);
+                if (type.contains("char") || type.contains("date") || type.contains("time") || type.contains("bool")) {
+                    columnValue = "'" + columnValue + "'";
+                }
+                builder.append(delim).append(columnValue);
+                delim = ",";
+            }
+            builder.append(")");
+            st.executeUpdate(insertQ + builder.toString());
+        }
+        st.close();
+    }
+
+    private void createNewTable(String tableName, ResultSetMetaData rsmd) throws SQLException {
+        String createQuery = this.getCreateQuery(tableName, rsmd);
+        Statement st = conn.createStatement();
+        st.execute(createQuery);
+    }
+
+    private String getCreateQuery(String tableName, ResultSetMetaData rsmd) throws SQLException {
+        StringBuilder builder = new StringBuilder("");
+        builder.append("Create table ").append(tableName).append(" ( ");
+        String delim = "";
+        for (int i = 2; i <= rsmd.getColumnCount(); i++) {
+            builder.append(delim).append(rsmd.getColumnName(i)).append(" ").append(rsmd.getColumnTypeName(i));
+            delim = ",";
+        }
+        builder.append(" )");
+        return builder.toString();
     }
 
     private String constructQuery(String rawQuery, String inList) {
@@ -167,9 +242,9 @@ public class TestConnection {
         return list;
     }
 
-    private int getRowCount(String tableName) throws SQLException {
+    private int getRowCount(String query) throws SQLException {
         Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("select count(*) from hw3." + tableName);
+        ResultSet rs = st.executeQuery("select count(*) from (" + query + ") as T");
         if (rs.next()) {
             return rs.getInt(1);
         }
@@ -178,14 +253,30 @@ public class TestConnection {
 
     private int askForSampleNumber() {
         System.out.print("Enter the sample rows you want : ");
-        return sc.nextInt();
+        int i = sc.nextInt();
+        if (i<=0) {
+            throw new RuntimeException("Enter the sample number of rows greater than 0!");
+        }
+        return i;
     }
 
     private void showOptions() {
-        System.out.println("Please enter the options:");
+        System.out.println("Please enter the action number you want to perform:");
         System.out.println("1. Enter table name for sampling");
         System.out.println("2. Enter raw query");
         System.out.println("3. Reset seed");
         System.out.println("default. Exit");
+    }
+
+    public boolean isStdOut() {
+        System.out.print("Do you want to create a new table for the output of this query? (yes/no) : ");
+        String yes;
+        try {
+            yes = br.readLine().trim().toLowerCase();
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error in taking input!");
+        }
+        return !yes.equals("yes");
     }
 }
