@@ -10,21 +10,32 @@ import java.util.List;
 import java.util.Random;
 import java.util.Scanner;
 
-public class TestConnection {
+public class JdbcApp {
     BufferedReader br = null;
     Scanner sc = null;
     String url = "jdbc:postgresql://stampy.cs.wisc.edu/cs564instr?sslfactory=org.postgresql.ssl.NonValidatingFactory&ssl";
     Connection conn;
     Random random;
 
-    public TestConnection() throws SQLException {
+    public JdbcApp() throws SQLException {
         sc = new Scanner(System.in);
         br = new BufferedReader(new InputStreamReader(System.in));
         conn = DriverManager.getConnection(url);
         random = new Random(System.currentTimeMillis());
     }
 
-    public void execute() throws SQLException {
+    public static void main(String[] args) throws Exception {
+//        new JdbcApp().setSchema();
+        new JdbcApp().execute();
+    }
+
+    private void setSchema() throws SQLException {
+        Statement st = conn.createStatement();
+        st.execute("set search_path to '" + "hw3" + "'");
+        st.close();
+    }
+
+    private void execute() throws SQLException {
         this.setSchema();
         while(true) {
             try {
@@ -53,17 +64,6 @@ public class TestConnection {
     protected void finalize() throws Throwable {
         conn.close();
         super.finalize();
-    }
-
-    public static void main(String[] args) throws Exception {
-//        new TestConnection().setSchema();
-        new TestConnection().execute();
-    }
-
-    private void setSchema() throws SQLException {
-        Statement st = conn.createStatement();
-        st.execute("set search_path to '" + "hw3" + "'");
-        st.close();
     }
 
     private void resetSeed() {
@@ -133,7 +133,6 @@ public class TestConnection {
             System.out.println();
             while (rs.next()) {
                 for (int i = 2; i <= columnsNumber; i++) {
-//                if (i > 1) System.out.print(",  ");
                     String columnValue = rs.getString(i);
                     System.out.print(columnValue + "\t");
                 }
