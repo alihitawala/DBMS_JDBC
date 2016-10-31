@@ -78,7 +78,7 @@ public class JdbcApp {
             query = br.readLine().trim().toLowerCase();
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException("Error in taking input!");
+            throw new RuntimeException("FATAL :: Error in taking input!");
         }
         this.sampleAndRunQuery(query);
     }
@@ -90,7 +90,7 @@ public class JdbcApp {
             tableName = br.readLine().trim().toLowerCase();
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException("Error in taking input!");
+            throw new RuntimeException("FATAL :: Error in taking input!");
         }
         String rawQuery = "select * from hw3." + tableName;
         this.sampleAndRunQuery(rawQuery);
@@ -121,7 +121,7 @@ public class JdbcApp {
         try {
             rs = st.executeQuery(query);
         } catch (Exception ex) {
-            throw new RuntimeException("Error in SQL query!");
+            throw new RuntimeException("ERROR :: Error in SQL query!");
         }
         ResultSetMetaData rsmd = rs.getMetaData();
         boolean isStdOut = isStdOut();
@@ -144,13 +144,13 @@ public class JdbcApp {
             try {
                 tableName = br.readLine().trim().toLowerCase();
             } catch (IOException e) {
-                throw new RuntimeException("Error in taking input!");
+                throw new RuntimeException("FATAL :: Error in taking input!");
             }
             try {
                 this.createNewTable(tableName, rsmd);
                 this.insertDataIntoNewTable(tableName, rs);
             } catch (Exception ex) {
-                throw new RuntimeException("Error in creating new table!");
+                throw new RuntimeException("ERROR :: Error in creating new table!");
             }
         }
         st.close();
@@ -222,7 +222,8 @@ public class JdbcApp {
 
     private List<Integer> sampleMfromN(int n, int N) {
         List<Integer> list = new ArrayList<Integer>();
-        if (n>=N) {
+        if (n>N) {
+            System.out.println("INFO :: Sampling less rows then asked as there are less rows in the output!");
             for (int i = 1; i <=N ; i++) {
                 list.add(i);
             }
@@ -247,14 +248,14 @@ public class JdbcApp {
         if (rs.next()) {
             return rs.getInt(1);
         }
-        throw new RuntimeException("SQL error!");
+        throw new RuntimeException("ERROR :: SQL error!");
     }
 
     private int askForSampleNumber() {
         System.out.print("Enter the sample rows you want : ");
         int i = sc.nextInt();
         if (i<=0) {
-            throw new RuntimeException("Enter the sample number of rows greater than 0!");
+            throw new RuntimeException("WARN :: Enter the sample number of rows greater than 0!");
         }
         return i;
     }
@@ -274,7 +275,7 @@ public class JdbcApp {
             yes = br.readLine().trim().toLowerCase();
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException("Error in taking input!");
+            throw new RuntimeException("ERROR :: Error in taking input!");
         }
         return !yes.equals("yes");
     }
